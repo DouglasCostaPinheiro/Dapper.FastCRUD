@@ -14,6 +14,8 @@
         private string _databaseColumnName;
         private int _columnOrder = -1;
         private PropertyMappingRelationship _childParentRelationship;
+        private string _sequenceName;
+        private bool _sequenceUpdatedByTrigger;
 
         /// <summary>
         /// Default constructor.
@@ -388,6 +390,39 @@
                 this.ValidateState();
 
                 _columnOrder = value;
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the name of sequence name the column is dependant on
+        /// </summary>
+        public string SequenceName {
+            get
+            {
+                return _sequenceName;
+            }
+            set
+            {
+                this.ValidateState();
+
+                _sequenceName = value;
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets if the sequence is updated by a trigger on the database automatically
+        /// </summary>
+        public bool SequenceUpdatedByTrigger
+        {
+            get
+            {
+                return _sequenceUpdatedByTrigger;
+            }
+            set
+            {
+                this.ValidateState();
+
+                _sequenceUpdatedByTrigger = value;
             }
         }
 

@@ -8,7 +8,6 @@
     using Dapper.FastCrud.Configuration.StatementOptions.Aggregated;
     using Dapper.FastCrud.Mappings;
     using Dapper.FastCrud.SqlBuilders;
-    using Dapper.FastCrud.Validations;
 
     internal class GenericSqlStatements<TEntity>: ISqlStatements<TEntity>
     {
@@ -67,25 +66,63 @@
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Insert(IDbConnection connection, TEntity entity, AggregatedSqlStatementOptions<TEntity> statementOptions)
         {
-            if (_sqlBuilder.RefreshOnInsertProperties.Length > 0)
+            //As much as it pains me to do so, I have to treat Oracle on a separate block since there is no 
+            //way to insert data and retrieve it on the same statement, so I must use a table and select from it
+            //and drop it after select
+            if (!(_sqlBuilder is OracleBuilder))
             {
-                var insertedEntity =
-                    connection.Query<TEntity>(
+                if (_sqlBuilder.RefreshOnInsertProperties.Length > 0)
+                {
+                    var insertedEntity =
+                        connection.Query<TEntity>(
+                            _sqlBuilder.ConstructFullInsertStatement(),
+                            entity,
+                            transaction: statementOptions.Transaction,
+                            commandTimeout: (int?)statementOptions.CommandTimeout?.TotalSeconds).FirstOrDefault();
+
+                    // copy all the database generated props back onto our entity
+                    this.CopyEntity(insertedEntity, entity, _sqlBuilder.RefreshOnInsertProperties);
+                }
+                else
+                {
+                    connection.Execute(
                         _sqlBuilder.ConstructFullInsertStatement(),
                         entity,
                         transaction: statementOptions.Transaction,
-                        commandTimeout: (int?)statementOptions.CommandTimeout?.TotalSeconds).FirstOrDefault();
-
-                // copy all the database generated props back onto our entity
-                this.CopyEntity(insertedEntity, entity, _sqlBuilder.RefreshOnInsertProperties);
+                        commandTimeout: (int?)statementOptions.CommandTimeout?.TotalSeconds);
+                }
             }
             else
             {
-                connection.Execute(
-                    _sqlBuilder.ConstructFullInsertStatement(),
-                    entity,
-                    transaction: statementOptions.Transaction,
-                    commandTimeout: (int?)statementOptions.CommandTimeout?.TotalSeconds);
+                if (_sqlBuilder.RefreshOnInsertProperties.Length > 0)
+                {
+                    //To guarantee well create a table we can drop, and its unique to that transaction, I've added a output parameter to the query
+                    var param = new DynamicParameters(entity);
+                    param.Add("temp_table_fastcrud", dbType: DbType.String, direction: ParameterDirection.Output, size: 40);
+
+                    connection.Execute(
+                            _sqlBuilder.ConstructFullInsertStatement(),
+                            param,
+                            transaction: statementOptions.Transaction,
+                            commandTimeout: (int?)statementOptions.CommandTimeout?.TotalSeconds);
+
+                    var temp_table_fastcrud = param.Get<string>("temp_table_fastcrud");
+
+                    var insertedEntity = connection.Query<TEntity>($"SELECT * FROM {temp_table_fastcrud}", null, statementOptions.Transaction).FirstOrDefault();
+
+                    connection.Execute($"DROP TABLE {temp_table_fastcrud}", null, statementOptions.Transaction);
+
+                    // copy all the database generated props back onto our entity
+                    this.CopyEntity(insertedEntity, entity, _sqlBuilder.RefreshOnInsertProperties);
+                }
+                else
+                {
+                    connection.Execute(
+                        _sqlBuilder.ConstructFullInsertStatement(),
+                        entity,
+                        transaction: statementOptions.Transaction,
+                        commandTimeout: (int?)statementOptions.CommandTimeout?.TotalSeconds);
+                }
             }
         }
 

@@ -21,6 +21,7 @@
         private static readonly SqlDatabaseOptions _defaultMsSqlDatabaseOptions = new MsSqlDatabaseOptions();
         private static readonly SqlDatabaseOptions _defaultMySqlDatabaseOptions = new MySqlDatabaseOptions();
         private static readonly SqlDatabaseOptions _defaultPostgreSqlDatabaseOptions = new PostreSqlDatabaseOptions();
+        private static readonly SqlDatabaseOptions _defaultOracleSqlDatabaseOptions = new OracleDatabaseOptions();
         private static readonly SqlDatabaseOptions _defaultGenericSqlDatabaseOptions = new SqlDatabaseOptions();
 
         private static readonly Type[] _simpleSqlTypes = new[]
@@ -120,6 +121,8 @@
                     return _defaultPostgreSqlDatabaseOptions;
                 case SqlDialect.MySql:
                     return _defaultMySqlDatabaseOptions;
+                case SqlDialect.Oracle:
+                    return _defaultOracleSqlDatabaseOptions;
                 default:
                     return _defaultGenericSqlDatabaseOptions;
             }
@@ -194,6 +197,22 @@
             {
                 propertyMapping.ExcludeFromInserts();
                 propertyMapping.RefreshOnInserts();
+            }
+
+            if (propertyAttributes.OfType<SequenceDependantAttribute>().Any())
+            {
+                
+                propertyMapping.RefreshOnInserts();
+
+                var sequenceDependantAttribute = propertyAttributes.OfType<SequenceDependantAttribute>().FirstOrDefault();
+                if (sequenceDependantAttribute != null)
+                {
+                    propertyMapping.SequenceName = sequenceDependantAttribute.SequenceName;
+                    if (sequenceDependantAttribute.SequenceUpdatedByTrigger)
+                        propertyMapping.ExcludeFromInserts();
+                    else
+                        propertyMapping.IncludeInInserts();
+                }
             }
 
             var databaseGeneratedAttributes = propertyAttributes.OfType<DatabaseGeneratedAttribute>();

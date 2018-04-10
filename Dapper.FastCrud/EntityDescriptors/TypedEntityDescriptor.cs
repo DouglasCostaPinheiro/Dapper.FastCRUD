@@ -68,6 +68,9 @@
                 case SqlDialect.SqLite:
                     statementSqlBuilder = new SqLiteBuilder(this, entityMapping);
                     break;
+                case SqlDialect.Oracle:
+                    statementSqlBuilder = new OracleBuilder(this, entityMapping);
+                    break;
                 default:
                     throw new NotSupportedException($"Dialect {entityMapping.Dialect} is not supported");
             }

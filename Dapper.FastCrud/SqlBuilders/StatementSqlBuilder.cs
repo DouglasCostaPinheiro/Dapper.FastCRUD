@@ -83,6 +83,9 @@
             this.InsertProperties = this.SelectProperties
                 .Where(propInfo => !propInfo.IsExcludedFromInserts)
                 .ToArray();
+            this.SequenceDependantProperties = this.SelectProperties
+                .Where(propInfo => !string.IsNullOrWhiteSpace(propInfo.SequenceName))
+                .ToArray();
 
             _noAliasTableName = new Lazy<string>(()=>this.GetTableNameInternal(),LazyThreadSafetyMode.PublicationOnly);
             _noAliasKeysWhereClause = new Lazy<string>(()=>this.ConstructKeysWhereClauseInternal(), LazyThreadSafetyMode.PublicationOnly);
@@ -112,6 +115,7 @@
         public PropertyMapping[] InsertKeyDatabaseGeneratedProperties { get; }
         public PropertyMapping[] RefreshOnInsertProperties { get; }
         public PropertyMapping[] RefreshOnUpdateProperties { get; }
+        public PropertyMapping[] SequenceDependantProperties { get; }
         protected string IdentifierStartDelimiter { get; }
         protected string IdentifierEndDelimiter { get; }
         protected bool UsesSchemaForTableNames { get; }
@@ -243,6 +247,16 @@
         public string ConstructUpdateClause(string tableAlias = null)
         {
             return tableAlias == null ? _noAliasUpdateClause.Value : this.ConstructUpdateClauseInternal(tableAlias);
+        }
+
+        /// <summary>
+        /// Constructs a update clause of form <code>ColumnName=@PropertyName, ...</code> with all the updateable columns (e.g. <code>EmployeeId=@EmployeeId,DeskNo=@DeskNo</code>)
+        /// </summary>
+        /// <param name="tableAlias">Optional table alias.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public string ConstructWhereClauseForInsertSequenceDependant()
+        {
+            return this.ConstructWhereClauseForInsertSequenceDependantInternal();
         }
 
         /// <summary>
@@ -631,7 +645,7 @@
         /// </summary>
         protected virtual string ConstructParamEnumerationForInsertInternal()
         {
-            return string.Join(",", this.InsertProperties.Select(propInfo => $"{this.ParameterPrefix + propInfo.PropertyName}"));
+            return string.Join(",", this.SequenceDependantProperties.Where(propInfo => !propInfo.SequenceUpdatedByTrigger).Select(propInfo => $"{propInfo.SequenceName}.NEXTVAL").Concat(this.InsertProperties.Except(this.SequenceDependantProperties).Select(propInfo => $"{this.ParameterPrefix + propInfo.PropertyName}")));
         }
 
         /// <summary>
@@ -641,6 +655,13 @@
         protected virtual string ConstructUpdateClauseInternal(string tableAlias = null)
         {
             return string.Join(",", UpdateProperties.Select(propInfo => $"{this.GetColumnName(propInfo, tableAlias, false)}={this.ParameterPrefix + propInfo.PropertyName}"));
+        }
+
+        protected virtual string ConstructWhereClauseForInsertSequenceDependantInternal()
+        {
+            if (this.SequenceDependantProperties.Length == 0)
+                return null;
+            return $"WHERE {string.Join(" AND ", this.SequenceDependantProperties.Select(propInfo => $"{this.GetColumnName(propInfo.PropertyName)} = {propInfo.SequenceName}.CURRVAL" ))}";
         }
 
         /// <summary>

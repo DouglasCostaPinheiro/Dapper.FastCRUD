@@ -76,6 +76,12 @@ namespace Dapper.FastCrud
         string ConstructUpdateClause(string tableAlias = null);
 
         /// <summary>
+        /// Constructs a WHERE clause for retrieving a record after inserting it with a sequence, based on its current value (e.g <code>WHERE EmployeeId = EMPLOYEDD_ID_SEQ.CURRVAL</code>)
+        /// </summary>
+        /// <returns></returns>
+        string ConstructWhereClauseForInsertSequenceDependant();
+
+        /// <summary>
         /// Produces a formatted string from a formattable string.
         /// Table and column names will be resolved, and identifier will be properly delimited.
         /// </summary>

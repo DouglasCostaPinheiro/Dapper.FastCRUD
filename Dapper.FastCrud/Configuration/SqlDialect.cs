@@ -24,6 +24,11 @@ namespace Dapper.FastCrud
         /// <summary>
         /// PostgreSql
         /// </summary>
-        PostgreSql
+        PostgreSql,
+
+        /// <summary>
+        /// Oracle
+        /// </summary>
+        Oracle
     }
 }
